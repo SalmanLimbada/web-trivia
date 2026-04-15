@@ -141,12 +141,8 @@ export default {
       } finally {
         this.loadingCategories = false
       }
-    }
-  },
-  mounted() {
-    this.loadCategories()
-
-    socket.on('room-created', (room) => {
+    },
+    handleRoomCreated(room) {
       this.$router.push({
         path: '/game',
         query: {
@@ -155,9 +151,8 @@ export default {
           host: 'true'
         }
       })
-    })
-
-    socket.on('room-state', (room) => {
+    },
+    handleRoomState(room) {
       if (!this.roomCode) return
       if (room.code !== this.roomCode.toUpperCase()) return
 
@@ -168,11 +163,21 @@ export default {
           name: this.playerName
         }
       })
-    })
-
-    socket.on('error', (msg) => {
+    },
+    handleError(msg) {
       this.error = msg
-    })
+    }
+  },
+  mounted() {
+    this.loadCategories()
+    socket.on('room-created', this.handleRoomCreated)
+    socket.on('room-state', this.handleRoomState)
+    socket.on('error', this.handleError)
+  },
+  beforeUnmount() {
+    socket.off('room-created', this.handleRoomCreated)
+    socket.off('room-state', this.handleRoomState)
+    socket.off('error', this.handleError)
   }
 }
 </script>

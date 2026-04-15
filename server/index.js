@@ -30,6 +30,13 @@ function parseCategoryId(rawCategoryId) {
   return Number.isNaN(categoryId) ? null : categoryId
 }
 
+function normalizeSettings({ questionCount, categoryId }) {
+  return {
+    questionCount: parseQuestionCount(questionCount),
+    categoryId: parseCategoryId(categoryId)
+  }
+}
+
 function getQuestionApiUrl({ amount, categoryId = null }) {
   const params = new URLSearchParams({
     amount: String(amount),
@@ -82,13 +89,6 @@ app.get('/api/categories', async (req, res) => {
 
 const rooms = {}
 
-function emitRoomPlayers(code) {
-  const room = rooms[code]
-  if (!room) return
-
-  io.to(code).emit('player-joined', room.players)
-}
-
 function getRoomPublicState(code) {
   const room = rooms[code]
 
@@ -98,8 +98,17 @@ function getRoomPublicState(code) {
     code,
     players: room.players,
     settings: room.settings,
-    gameStarted: room.gameStarted
+    phase: room.phase,
+    hostId: room.hostId,
+    finalPlayers: room.finalPlayers || room.players
   }
+}
+
+function emitRoomPlayers(code) {
+  const room = rooms[code]
+  if (!room) return
+
+  io.to(code).emit('player-joined', room.players)
 }
 
 function emitRoomState(code) {
@@ -107,19 +116,6 @@ function emitRoomState(code) {
   if (!roomState) return
 
   io.to(code).emit('room-state', roomState)
-}
-
-function emitCurrentQuestion(code) {
-  const room = rooms[code]
-  if (!room) return
-
-  io.to(code).emit('question-updated', {
-    question: room.questions[room.currentQuestion],
-    current: room.currentQuestion + 1,
-    total: room.questions.length,
-    answeredPlayers: room.answeredPlayers.length
-  })
-  io.to(code).emit('score-update', room.players)
 }
 
 function emitAnswerProgress(code) {
@@ -132,11 +128,54 @@ function emitAnswerProgress(code) {
   })
 }
 
+function emitCurrentQuestion(code) {
+  const room = rooms[code]
+  if (!room || room.questions.length === 0) return
+
+  io.to(code).emit('question-updated', {
+    question: room.questions[room.currentQuestion],
+    current: room.currentQuestion + 1,
+    total: room.questions.length,
+    answeredPlayers: room.answeredPlayers.length
+  })
+  io.to(code).emit('score-update', room.players)
+}
+
+function resetRoomToLobby(code, nextSettings = null) {
+  const room = rooms[code]
+  if (!room) return
+
+  if (nextSettings) {
+    room.settings = normalizeSettings(nextSettings)
+  }
+
+  room.phase = 'lobby'
+  room.questions = []
+  room.currentQuestion = 0
+  room.answeredPlayers = []
+  room.finalPlayers = room.players.map((player) => ({
+    ...player,
+    score: 0
+  }))
+  room.players = room.players.map((player) => ({
+    ...player,
+    score: 0
+  }))
+
+  emitRoomState(code)
+  io.to(code).emit('return-to-lobby', getRoomPublicState(code))
+}
+
 function finishGame(code) {
   const room = rooms[code]
   if (!room) return
 
-  room.gameStarted = false
+  room.phase = 'results'
+  room.finalPlayers = room.players.map((player) => ({ ...player }))
+  room.questions = []
+  room.currentQuestion = 0
+  room.answeredPlayers = []
+  emitRoomState(code)
   io.to(code).emit('game-over', room.players)
 }
 
@@ -153,6 +192,39 @@ function advanceQuestion(code) {
   }
 
   emitCurrentQuestion(code)
+  emitAnswerProgress(code)
+}
+
+function assignNextHost(room) {
+  room.hostId = room.players.length > 0 ? room.players[0].id : null
+}
+
+function removePlayerFromRoom(code, socketId) {
+  const room = rooms[code]
+  if (!room) return
+
+  const wasHost = room.hostId === socketId
+
+  room.players = room.players.filter((player) => player.id !== socketId)
+  room.answeredPlayers = room.answeredPlayers.filter((id) => id !== socketId)
+
+  if (room.players.length === 0) {
+    delete rooms[code]
+    return
+  }
+
+  if (wasHost) {
+    assignNextHost(room)
+  }
+
+  if (room.phase === 'game' && room.answeredPlayers.length >= room.players.length) {
+    advanceQuestion(code)
+    return
+  }
+
+  emitRoomPlayers(code)
+  emitRoomState(code)
+  emitAnswerProgress(code)
 }
 
 io.on('connection', (socket) => {
@@ -160,24 +232,24 @@ io.on('connection', (socket) => {
 
   socket.on('create-room', ({ playerName, questionCount, categoryId }) => {
     const code = Math.random().toString(36).substring(2, 7).toUpperCase()
-    const settings = {
-      questionCount: parseQuestionCount(questionCount),
-      categoryId: parseCategoryId(categoryId)
-    }
+    const settings = normalizeSettings({ questionCount, categoryId })
 
     rooms[code] = {
       players: [{ id: socket.id, name: playerName, score: 0 }],
       questions: [],
       currentQuestion: 0,
       answeredPlayers: [],
-      gameStarted: false,
-      settings
+      finalPlayers: [],
+      settings,
+      phase: 'lobby',
+      hostId: socket.id
     }
 
     socket.data.roomCode = code
     socket.join(code)
     socket.emit('room-created', getRoomPublicState(code))
     emitRoomPlayers(code)
+    emitRoomState(code)
     console.log('room created:', code)
   })
 
@@ -193,6 +265,26 @@ io.on('connection', (socket) => {
     socket.join(code)
     emitRoomPlayers(code)
     emitRoomState(code)
+    emitAnswerProgress(code)
+  })
+
+  socket.on('update-room-settings', ({ code, questionCount, categoryId }) => {
+    const room = rooms[code]
+
+    if (!room) {
+      return socket.emit('error', 'Room not found')
+    }
+
+    if (room.hostId !== socket.id) {
+      return socket.emit('error', 'Only the host can change room settings')
+    }
+
+    if (room.phase !== 'lobby' && room.phase !== 'results') {
+      return socket.emit('error', 'Room settings can only be changed before the game starts')
+    }
+
+    room.settings = normalizeSettings({ questionCount, categoryId })
+    emitRoomState(code)
   })
 
   socket.on('start-game', async (code) => {
@@ -203,6 +295,10 @@ io.on('connection', (socket) => {
         return socket.emit('error', 'Room not found')
       }
 
+      if (room.hostId !== socket.id) {
+        return socket.emit('error', 'Only the host can start the game')
+      }
+
       const questions = await fetchQuestions({
         amount: room.settings.questionCount,
         categoryId: room.settings.categoryId
@@ -211,8 +307,8 @@ io.on('connection', (socket) => {
       room.questions = questions
       room.currentQuestion = 0
       room.answeredPlayers = []
-      room.gameStarted = true
-
+      room.finalPlayers = []
+      room.phase = 'game'
       room.players = room.players.map((player) => ({
         ...player,
         score: 0
@@ -227,22 +323,71 @@ io.on('connection', (socket) => {
     }
   })
 
+  socket.on('restart-game', ({ code, questionCount, categoryId }) => {
+    const room = rooms[code]
+
+    if (!room) {
+      return socket.emit('error', 'Room not found')
+    }
+
+    if (room.hostId !== socket.id) {
+      return socket.emit('error', 'Only the host can restart the room')
+    }
+
+    resetRoomToLobby(code, { questionCount, categoryId })
+  })
+
+  socket.on('restart-same-settings', async (code) => {
+    try {
+      const room = rooms[code]
+
+      if (!room) {
+        return socket.emit('error', 'Room not found')
+      }
+
+      if (room.hostId !== socket.id) {
+        return socket.emit('error', 'Only the host can restart the room')
+      }
+
+      const questions = await fetchQuestions({
+        amount: room.settings.questionCount,
+        categoryId: room.settings.categoryId
+      })
+
+      room.questions = questions
+      room.currentQuestion = 0
+      room.answeredPlayers = []
+      room.finalPlayers = []
+      room.phase = 'game'
+      room.players = room.players.map((player) => ({
+        ...player,
+        score: 0
+      }))
+
+      emitRoomState(code)
+      emitCurrentQuestion(code)
+      emitAnswerProgress(code)
+    } catch (error) {
+      socket.emit('error', 'Failed to restart game')
+    }
+  })
+
   socket.on('request-room-state', (code) => {
-    const roomState = getRoomPublicState(code)
-    if (!roomState) return
+    const room = rooms[code]
+    if (!room) return
 
-    socket.emit('room-state', roomState)
+    socket.emit('room-state', getRoomPublicState(code))
 
-    if (rooms[code].gameStarted && rooms[code].questions.length > 0) {
+    if (room.phase === 'game' && room.questions.length > 0) {
       socket.emit('question-updated', {
-        question: rooms[code].questions[rooms[code].currentQuestion],
-        current: rooms[code].currentQuestion + 1,
-        total: rooms[code].questions.length,
-        answeredPlayers: rooms[code].answeredPlayers.length
+        question: room.questions[room.currentQuestion],
+        current: room.currentQuestion + 1,
+        total: room.questions.length,
+        answeredPlayers: room.answeredPlayers.length
       })
       socket.emit('answer-progress', {
-        answeredPlayers: rooms[code].answeredPlayers.length,
-        totalPlayers: rooms[code].players.length
+        answeredPlayers: room.answeredPlayers.length,
+        totalPlayers: room.players.length
       })
     }
   })
@@ -250,7 +395,7 @@ io.on('connection', (socket) => {
   socket.on('submit-answer', ({ code, answer }) => {
     const room = rooms[code]
 
-    if (!room || !room.gameStarted) return
+    if (!room || room.phase !== 'game') return
 
     const current = room.questions[room.currentQuestion]
     const player = room.players.find((entry) => entry.id === socket.id)
@@ -271,21 +416,19 @@ io.on('connection', (socket) => {
     }
   })
 
+  socket.on('leave-room', (code) => {
+    if (!code || !rooms[code]) return
+
+    socket.leave(code)
+    removePlayerFromRoom(code, socket.id)
+    socket.data.roomCode = null
+  })
+
   socket.on('disconnect', () => {
     const { roomCode } = socket.data
 
     if (roomCode && rooms[roomCode]) {
-      const room = rooms[roomCode]
-
-      room.players = room.players.filter((player) => player.id !== socket.id)
-      room.answeredPlayers = room.answeredPlayers.filter((id) => id !== socket.id)
-
-      if (room.players.length === 0) {
-        delete rooms[roomCode]
-      } else {
-        emitRoomPlayers(roomCode)
-        emitRoomState(roomCode)
-      }
+      removePlayerFromRoom(roomCode, socket.id)
     }
 
     console.log('user disconnected:', socket.id)
