@@ -35,8 +35,8 @@
 </template>
 
 <script>
-import { io } from 'socket.io-client'
-const socket = io('http://localhost:3000')
+import { getSocket } from '../socket'
+const socket = getSocket()
 
 export default {
   data() {
@@ -51,6 +51,7 @@ export default {
   },
   methods: {
     startGame() {
+      console.log('clicking start, code:', this.code)
       socket.emit('start-game', this.code)
     },
     submitAnswer(answer) {

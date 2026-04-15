@@ -22,11 +22,14 @@ app.get('/api/questions', async (req, res) => {
 const rooms = {}
 
 io.on('connection', (socket) => {
+  console.log('user connected:', socket.id)
+
   socket.on('create-room', (playerName) => {
     const code = Math.random().toString(36).substring(2, 7).toUpperCase()
     rooms[code] = { players: [{ id: socket.id, name: playerName, score: 0 }], questions: [], currentQuestion: 0 }
     socket.join(code)
     socket.emit('room-created', code)
+    console.log('room created:', code)
   })
 
   socket.on('join-room', ({ code, playerName }) => {
@@ -37,19 +40,20 @@ io.on('connection', (socket) => {
   })
 
   socket.on('start-game', async (code) => {
-  try {
-    const response = await fetch('https://opentdb.com/api.php?amount=10&type=multiple')
-    const data = await response.json()
-    if (!data.results || data.results.length === 0) {
-      return socket.emit('error', 'Failed to load questions')
+    try {
+      const response = await fetch('https://opentdb.com/api.php?amount=10&type=multiple')
+      const data = await response.json()
+      if (!data.results || data.results.length === 0) {
+        return socket.emit('error', 'Failed to load questions')
+      }
+      rooms[code].questions = data.results
+      rooms[code].currentQuestion = 0
+      io.to(code).emit('game-started', rooms[code].questions[0])
+      console.log('game started in room:', code)
+    } catch (err) {
+      socket.emit('error', 'Failed to load questions')
     }
-    rooms[code].questions = data.results
-    rooms[code].currentQuestion = 0
-    io.to(code).emit('game-started', rooms[code].questions[0])
-  } catch (err) {
-    socket.emit('error', 'Failed to load questions')
-  }
-})
+  })
 
   socket.on('submit-answer', ({ code, answer }) => {
     const room = rooms[code]
