@@ -6,7 +6,7 @@
           <p class="subtitle">Room: <strong>{{ code }}</strong></p>
         </div>
         <div class="level-right">
-          <p class="subtitle">Players: {{ players.length }}</p>
+          <p class="subtitle">Question {{ current }} of {{ total }}</p>
         </div>
       </div>
 
@@ -30,6 +30,13 @@
           ></button>
         </div>
       </div>
+
+      <div v-if="gameStarted" class="mt-4">
+        <p class="label">Scores:</p>
+        <ul>
+          <li v-for="player in players" :key="player.id">{{ player.name }}: {{ player.score }}</li>
+        </ul>
+      </div>
     </div>
   </div>
 </template>
@@ -46,7 +53,9 @@ export default {
       players: [],
       gameStarted: false,
       question: null,
-      answers: []
+      answers: [],
+      current: 0,
+      total: 0
     }
   },
   methods: {
@@ -65,13 +74,23 @@ export default {
     socket.on('player-joined', (players) => {
       this.players = players
     })
-    socket.on('game-started', (question) => {
+    socket.on('game-started', ({ question, current, total }) => {
       this.gameStarted = true
       this.question = question
       this.answers = this.shuffleAnswers(question)
+      this.current = current
+      this.total = total
+    })
+    socket.on('next-question', ({ question, current, total }) => {
+      this.question = question
+      this.answers = this.shuffleAnswers(question)
+      this.current = current
+      this.total = total
     })
     socket.on('score-update', (players) => {
       this.players = players
+    })
+    socket.on('game-over', (players) => {
       this.$router.push({ path: '/results', query: { players: JSON.stringify(players) } })
     })
   }

@@ -7,6 +7,17 @@
         <input class="input" type="text" v-model="playerName" placeholder="Enter your name" />
       </div>
       <div class="field">
+        <label class="label">Number of Questions</label>
+        <div class="select is-fullwidth">
+          <select v-model="questionCount">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="15">15</option>
+            <option value="20">20</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
         <button class="button is-primary is-fullwidth mb-2" @click="createRoom">Create Room</button>
       </div>
       <div class="field has-addons">
@@ -31,13 +42,14 @@ export default {
     return {
       playerName: '',
       roomCode: '',
+      questionCount: 10,
       error: ''
     }
   },
   methods: {
     createRoom() {
       if (!this.playerName) return this.error = 'Enter your name'
-      socket.emit('create-room', this.playerName)
+      socket.emit('create-room', { playerName: this.playerName, questionCount: parseInt(this.questionCount) })
     },
     joinRoom() {
       if (!this.playerName) return this.error = 'Enter your name'

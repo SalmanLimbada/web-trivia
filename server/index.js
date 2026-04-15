@@ -24,9 +24,9 @@ const rooms = {}
 io.on('connection', (socket) => {
   console.log('user connected:', socket.id)
 
-  socket.on('create-room', (playerName) => {
+  socket.on('create-room', ({ playerName, questionCount }) => {
     const code = Math.random().toString(36).substring(2, 7).toUpperCase()
-    rooms[code] = { players: [{ id: socket.id, name: playerName, score: 0 }], questions: [], currentQuestion: 0 }
+    rooms[code] = { players: [{ id: socket.id, name: playerName, score: 0 }], questions: [], currentQuestion: 0, questionCount: questionCount || 10 }
     socket.join(code)
     socket.emit('room-created', code)
     console.log('room created:', code)
@@ -41,14 +41,16 @@ io.on('connection', (socket) => {
 
   socket.on('start-game', async (code) => {
     try {
-      const response = await fetch('https://opentdb.com/api.php?amount=10&type=multiple')
+      const room = rooms[code]
+      const amount = room.questionCount || 10
+      const response = await fetch(`https://opentdb.com/api.php?amount=${amount}&type=multiple`)
       const data = await response.json()
       if (!data.results || data.results.length === 0) {
         return socket.emit('error', 'Failed to load questions')
       }
-      rooms[code].questions = data.results
-      rooms[code].currentQuestion = 0
-      io.to(code).emit('game-started', rooms[code].questions[0])
+      room.questions = data.results
+      room.currentQuestion = 0
+      io.to(code).emit('game-started', { question: room.questions[0], current: 1, total: room.questions.length })
       console.log('game started in room:', code)
     } catch (err) {
       socket.emit('error', 'Failed to load questions')
@@ -60,7 +62,15 @@ io.on('connection', (socket) => {
     const current = room.questions[room.currentQuestion]
     const player = room.players.find(p => p.id === socket.id)
     if (answer === current.correct_answer) player.score += 10
-    io.to(code).emit('score-update', room.players)
+
+    room.currentQuestion++
+
+    if (room.currentQuestion >= room.questions.length) {
+      io.to(code).emit('game-over', room.players)
+    } else {
+      io.to(code).emit('next-question', { question: room.questions[room.currentQuestion], current: room.currentQuestion + 1, total: room.questions.length })
+      io.to(code).emit('score-update', room.players)
+    }
   })
 
   socket.on('disconnect', () => {
