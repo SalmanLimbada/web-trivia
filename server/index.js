@@ -37,12 +37,19 @@ io.on('connection', (socket) => {
   })
 
   socket.on('start-game', async (code) => {
+  try {
     const response = await fetch('https://opentdb.com/api.php?amount=10&type=multiple')
     const data = await response.json()
+    if (!data.results || data.results.length === 0) {
+      return socket.emit('error', 'Failed to load questions')
+    }
     rooms[code].questions = data.results
     rooms[code].currentQuestion = 0
     io.to(code).emit('game-started', rooms[code].questions[0])
-  })
+  } catch (err) {
+    socket.emit('error', 'Failed to load questions')
+  }
+})
 
   socket.on('submit-answer', ({ code, answer }) => {
     const room = rooms[code]
