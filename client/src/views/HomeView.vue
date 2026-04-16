@@ -5,7 +5,7 @@
     <p class="page-lead has-text-centered">
       Create a room, pick a category, and challenge everyone in a fast trivia round.
     </p>
-    <div class="box hero-card">
+    <div ref="heroCard" class="box hero-card">
       <div class="card-section mb-4">
         <p class="section-title">Create Or Join</p>
         <p class="section-copy">Start a new room as host or enter a room code to jump into an existing game.</p>
@@ -13,7 +13,14 @@
 
       <div class="field">
         <label class="label control-label">Your Name</label>
-        <input class="input" type="text" v-model.trim="playerName" placeholder="Enter your name" />
+        <input
+          ref="nameInput"
+          class="input"
+          type="text"
+          v-model.trim="playerName"
+          placeholder="Enter your name"
+          @keyup.enter="handleEnterFromMainFields"
+        />
       </div>
 
       <div class="field">
@@ -32,12 +39,14 @@
       <div v-if="questionMode === 'custom'" class="field">
         <label class="label control-label">Custom Question Count</label>
         <input
+          ref="questionInput"
           class="input"
           type="number"
           min="1"
           max="50"
           v-model="customQuestionCount"
           placeholder="Enter a number from 1 to 50"
+          @keyup.enter="createRoom"
         />
         <p class="help field-help">OpenTDB supports up to 50 questions per request.</p>
       </div>
@@ -55,17 +64,24 @@
       </div>
 
       <div class="field">
-        <button class="button is-primary is-fullwidth mb-2" @click="createRoom">Create Room</button>
+        <button ref="createButton" class="button is-primary is-fullwidth mb-2" @click="createRoom">Create Room</button>
       </div>
 
       <div class="join-divider">or join with a code</div>
 
       <div class="field has-addons">
         <div class="control is-expanded">
-          <input class="input" type="text" v-model.trim="roomCode" placeholder="Enter room code" />
+          <input
+            ref="roomInput"
+            class="input"
+            type="text"
+            v-model.trim="roomCode"
+            placeholder="Enter room code"
+            @keyup.enter="joinRoom"
+          />
         </div>
         <div class="control">
-          <button class="button is-info" @click="joinRoom">Join</button>
+          <button ref="joinButton" class="button is-info" @click="joinRoom">Join</button>
         </div>
       </div>
 
@@ -94,12 +110,53 @@ export default {
     }
   },
   methods: {
+    animateShake(element) {
+      if (!element) return
+      const $ = window.jQuery
+      if (!$) return
+      const node = $(element)
+      node.removeClass('jq-shake')
+      void node[0].offsetWidth
+      node.addClass('jq-shake')
+      window.setTimeout(() => node.removeClass('jq-shake'), 400)
+    },
+    animateFlash(element) {
+      if (!element) return
+      const $ = window.jQuery
+      if (!$) return
+      const node = $(element)
+      node.removeClass('jq-flash')
+      void node[0].offsetWidth
+      node.addClass('jq-flash')
+      window.setTimeout(() => node.removeClass('jq-flash'), 700)
+    },
+    animatePulse(buttonElement) {
+      if (!buttonElement) return
+      const $ = window.jQuery
+      if (!$) return
+      const node = $(buttonElement)
+      node.addClass('has-jquery-pulse')
+      node.removeClass('jq-active')
+      void node[0].offsetWidth
+      node.addClass('jq-active')
+      window.setTimeout(() => node.removeClass('jq-active'), 900)
+    },
+    handleEnterFromMainFields() {
+      if (this.roomCode) {
+        this.joinRoom()
+        return
+      }
+
+      this.createRoom()
+    },
     getQuestionCount() {
       const rawValue = this.questionMode === 'custom' ? this.customQuestionCount : this.questionMode
       const count = Number.parseInt(rawValue, 10)
 
       if (Number.isNaN(count) || count < 1 || count > 50) {
         this.error = 'Choose a question count from 1 to 50'
+        this.animateShake(this.$refs.heroCard)
+        this.animateFlash(this.$refs.questionInput)
         return null
       }
 
@@ -110,11 +167,15 @@ export default {
 
       if (!this.playerName) {
         this.error = 'Enter your name'
+        this.animateShake(this.$refs.heroCard)
+        this.animateFlash(this.$refs.nameInput)
         return
       }
 
       const questionCount = this.getQuestionCount()
       if (!questionCount) return
+
+      this.animatePulse(this.$refs.createButton)
 
       socket.emit('create-room', {
         playerName: this.playerName,
@@ -127,13 +188,19 @@ export default {
 
       if (!this.playerName) {
         this.error = 'Enter your name'
+        this.animateShake(this.$refs.heroCard)
+        this.animateFlash(this.$refs.nameInput)
         return
       }
 
       if (!this.roomCode) {
         this.error = 'Enter a room code'
+        this.animateShake(this.$refs.heroCard)
+        this.animateFlash(this.$refs.roomInput)
         return
       }
+
+      this.animatePulse(this.$refs.joinButton)
 
       socket.emit('join-room', {
         code: this.roomCode.toUpperCase(),
@@ -177,6 +244,7 @@ export default {
     },
     handleError(msg) {
       this.error = msg
+      this.animateShake(this.$refs.heroCard)
     }
   },
   mounted() {

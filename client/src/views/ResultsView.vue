@@ -6,7 +6,7 @@
       The round is over. Check the final ranking and start the next game when everyone is ready.
     </p>
     <div class="box results-card">
-      <p v-if="sortedPlayers.length" class="winner-banner">
+      <p v-if="sortedPlayers.length" ref="winnerBanner" class="winner-banner">
         Winner: {{ sortedPlayers[0].name }}
       </p>
 
@@ -18,7 +18,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="player in sortedPlayers" :key="player.id">
+          <tr v-for="player in sortedPlayers" :key="player.id" class="results-row">
             <td>{{ player.name }}<span v-if="player.id === hostId"> (host)</span></td>
             <td>{{ player.score }}</td>
           </tr>
@@ -77,6 +77,27 @@ export default {
     }
   },
   methods: {
+    animateResultsReveal() {
+      this.$nextTick(() => {
+        const $ = window.jQuery
+        if (!$) return
+        const winnerBanner = this.$refs.winnerBanner
+        if (winnerBanner) {
+          $(winnerBanner).stop(true, true).hide().slideDown(250).addClass('jq-flash')
+          window.setTimeout(() => $(winnerBanner).removeClass('jq-flash'), 700)
+        }
+
+        $(this.$el)
+          .find('.results-row')
+          .each((index, row) => {
+            $(row)
+              .stop(true, true)
+              .css('opacity', 0)
+              .delay(120 * index)
+              .animate({ opacity: 1 }, 220)
+          })
+      })
+    },
     restartGame() {
       if (!this.isHost || !this.code) return
 
@@ -136,6 +157,7 @@ export default {
       this.message = this.isHost
         ? 'You can restart immediately with the same settings, or return everyone to the lobby and change them.'
         : 'Waiting for the host to restart the room or go back home.'
+      this.animateResultsReveal()
     },
     handleError(msg) {
       this.isRestarting = false
@@ -152,6 +174,8 @@ export default {
     if (this.code) {
       socket.emit('request-room-state', this.code)
     }
+
+    this.animateResultsReveal()
   },
   beforeUnmount() {
     socket.off('room-state', this.handleRoomState)

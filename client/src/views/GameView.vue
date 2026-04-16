@@ -93,7 +93,7 @@
         <div class="question-panel">
           <p class="label control-label mb-2">Answer Breakdown</p>
           <p class="question-text mb-4" v-html="summaryData.question"></p>
-          <p class="answer-callout mb-4">
+          <p ref="answerCallout" class="answer-callout mb-4">
             Correct answer:
             <strong v-html="summaryData.correctAnswer"></strong>
           </p>
@@ -102,17 +102,18 @@
       </div>
 
       <div v-if="roomPhase === 'game' && question && !summaryData">
-        <div class="question-panel">
+        <div ref="currentQuestionPanel" class="question-panel">
           <p class="question-kicker">Current Question</p>
           <p class="question-text mb-4" v-html="question.question"></p>
         </div>
         <div class="buttons">
           <button
-            v-for="answer in answers"
+            v-for="(answer, index) in answers"
             :key="answer"
-            class="button is-info is-fullwidth mb-2"
+            class="button is-info is-fullwidth mb-2 trivia-answer-button has-jquery-pulse"
+            :data-answer-index="index + 1"
             :disabled="hasAnsweredCurrentQuestion"
-            @click="submitAnswer(answer)"
+            @click="submitAnswer(answer, $event)"
             v-html="answer"
           ></button>
         </div>
@@ -177,6 +178,43 @@ export default {
     }
   },
   methods: {
+    animateQuestionPanel() {
+      this.$nextTick(() => {
+        const $ = window.jQuery
+        if (!$) return
+        const panel = this.$refs.currentQuestionPanel
+        if (!panel) return
+
+        $(panel).stop(true, true).hide().slideDown(260).addClass('jq-flash')
+        window.setTimeout(() => {
+          $(panel).removeClass('jq-flash')
+        }, 700)
+      })
+    },
+    animateAnswerSelection(buttonElement) {
+      if (!buttonElement) return
+      const $ = window.jQuery
+      if (!$) return
+
+      const button = $(buttonElement)
+      button.removeClass('jq-active')
+      void button[0].offsetWidth
+      button.addClass('jq-active')
+      window.setTimeout(() => button.removeClass('jq-active'), 900)
+    },
+    animateSummaryCallout() {
+      this.$nextTick(() => {
+        const $ = window.jQuery
+        if (!$) return
+        const callout = this.$refs.answerCallout
+        if (!callout) return
+
+        $(callout).stop(true, true).hide().fadeIn(220).addClass('jq-flash')
+        window.setTimeout(() => {
+          $(callout).removeClass('jq-flash')
+        }, 700)
+      })
+    },
     getQuestionCount() {
       const rawValue = this.questionMode === 'custom' ? this.customQuestionCount : this.questionMode
       const count = Number.parseInt(rawValue, 10)
@@ -234,10 +272,11 @@ export default {
 
       socket.emit('start-game', this.code)
     },
-    submitAnswer(answer) {
+    submitAnswer(answer, event) {
       if (this.hasAnsweredCurrentQuestion || this.summaryData) return
 
       this.hasAnsweredCurrentQuestion = true
+      this.animateAnswerSelection(event?.currentTarget)
       socket.emit('submit-answer', { code: this.code, answer })
     },
     shuffleAnswers(question) {
@@ -395,11 +434,13 @@ export default {
       if (this.$refs.summaryChartContainer) {
         d3.select(this.$refs.summaryChartContainer).selectAll('*').remove()
       }
+      this.animateQuestionPanel()
     },
     handleQuestionSummary(summary) {
       this.summaryData = summary
       this.$nextTick(() => {
         this.renderSummaryChart()
+        this.animateSummaryCallout()
       })
     },
     handleAnswerProgress({ answeredPlayers }) {
