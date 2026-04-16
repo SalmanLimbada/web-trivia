@@ -128,6 +128,11 @@ export default {
         await this.audioContext.resume()
       }
 
+      if (this.audioContext.state !== 'running') {
+        this.isMusicEnabled = false
+        return false
+      }
+
       this.applyMusicVolume()
 
       if (!this.musicIntervalId) {
@@ -151,17 +156,27 @@ export default {
     setupAutoplayFallback() {
       if (this.unlockHandler) return
 
-      this.unlockHandler = () => {
-        this.removeUnlockListeners()
-        this.startMusic().catch(() => {})
+      this.unlockHandler = async () => {
+        try {
+          const started = await this.startMusic()
+          if (started) {
+            this.removeUnlockListeners()
+          }
+        } catch (error) {
+          // Keep listeners active until the browser allows playback.
+        }
       }
 
+      document.addEventListener('click', this.unlockHandler, true)
+      document.addEventListener('touchstart', this.unlockHandler, true)
       window.addEventListener('pointerdown', this.unlockHandler)
       window.addEventListener('keydown', this.unlockHandler)
     },
     removeUnlockListeners() {
       if (!this.unlockHandler) return
 
+      document.removeEventListener('click', this.unlockHandler, true)
+      document.removeEventListener('touchstart', this.unlockHandler, true)
       window.removeEventListener('pointerdown', this.unlockHandler)
       window.removeEventListener('keydown', this.unlockHandler)
       this.unlockHandler = null
@@ -172,7 +187,10 @@ export default {
       }
 
       try {
-        await this.startMusic()
+        const started = await this.startMusic()
+        if (!started) {
+          this.setupAutoplayFallback()
+        }
       } catch (error) {
         this.setupAutoplayFallback()
       }
@@ -180,6 +198,7 @@ export default {
   },
   mounted() {
     this.applyTheme()
+    this.setupAutoplayFallback()
     this.attemptAutoPlayMusic()
   },
   beforeUnmount() {
