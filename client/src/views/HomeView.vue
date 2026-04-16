@@ -1,7 +1,16 @@
 <template>
   <div class="view-wrap">
+    <p class="eyebrow">Live Multiplayer Trivia</p>
     <h1 class="title has-text-centered page-title">Web Trivia</h1>
+    <p class="page-lead has-text-centered">
+      Create a room, pick a category, and challenge everyone in a fast trivia round.
+    </p>
     <div class="box hero-card">
+      <div class="card-section mb-4">
+        <p class="section-title">Create Or Join</p>
+        <p class="section-copy">Start a new room as host or enter a room code to jump into an existing game.</p>
+      </div>
+
       <div class="field">
         <label class="label control-label">Your Name</label>
         <input class="input" type="text" v-model.trim="playerName" placeholder="Enter your name" />
@@ -49,6 +58,8 @@
         <button class="button is-primary is-fullwidth mb-2" @click="createRoom">Create Room</button>
       </div>
 
+      <div class="join-divider">or join with a code</div>
+
       <div class="field has-addons">
         <div class="control is-expanded">
           <input class="input" type="text" v-model.trim="roomCode" placeholder="Enter room code" />
@@ -59,7 +70,7 @@
       </div>
 
       <p v-if="loadingCategories" class="subtle-text mb-2">Loading categories...</p>
-      <p v-if="error" class="has-text-danger">{{ error }}</p>
+      <p v-if="error" class="error-text">{{ error }}</p>
     </div>
   </div>
 </template>

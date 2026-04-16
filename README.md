@@ -1,7 +1,7 @@
 # Web Trivia
 
 This README is only for the current state of the project so far.
-It is here to help teammates clone the repo and run what has been built up to this point.
+It is here to help run what has been built up to this point.
 
 ## What is working right now
 

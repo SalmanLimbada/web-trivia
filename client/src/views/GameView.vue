@@ -1,7 +1,7 @@
 <template>
   <div class="view-wrap">
     <div class="box game-card">
-      <div class="level">
+      <div class="game-header">
         <div class="level-left">
           <div>
             <p class="room-chip">Room: {{ code }}</p>
@@ -11,9 +11,9 @@
             </p>
           </div>
         </div>
-        <div class="level-right">
+        <div class="level-right game-header-right">
           <div class="has-text-right">
-            <p class="subtitle mb-2">Question {{ current }} of {{ total }}</p>
+            <p class="subtitle game-progress mb-2">Question {{ current }} of {{ total }}</p>
             <button class="button is-small is-light" @click="leaveRoom">Exit Game</button>
           </div>
         </div>
@@ -27,6 +27,11 @@
         <p class="status-note has-text-centered mb-4">Waiting in the lobby...</p>
 
         <div v-if="isHost" class="mb-5">
+          <div class="card-section mb-4">
+            <p class="section-title">Room Settings</p>
+            <p class="section-copy">Choose the number of questions and category before you start the round.</p>
+          </div>
+
           <div class="field">
             <label class="label control-label">Question Count</label>
             <div class="select is-fullwidth">
@@ -75,17 +80,30 @@
         </p>
 
         <div class="players-panel">
-        <p class="label control-label">Players:</p>
-        <ul class="player-list mb-0">
-          <li v-for="player in players" :key="player.id">
-            {{ player.name }}<span v-if="player.id === hostId"> (host)</span>
-          </li>
-        </ul>
+          <p class="label control-label">Players:</p>
+          <ul class="player-list mb-0">
+            <li v-for="player in players" :key="player.id">
+              {{ player.name }}<span v-if="player.id === hostId"> (host)</span>
+            </li>
+          </ul>
         </div>
       </div>
 
-      <div v-if="roomPhase === 'game' && question">
+      <div v-if="roomPhase === 'game' && summaryData" class="summary-panel">
         <div class="question-panel">
+          <p class="label control-label mb-2">Answer Breakdown</p>
+          <p class="question-text mb-4" v-html="summaryData.question"></p>
+          <p class="answer-callout mb-4">
+            Correct answer:
+            <strong v-html="summaryData.correctAnswer"></strong>
+          </p>
+          <div ref="summaryChartContainer" class="results-chart"></div>
+        </div>
+      </div>
+
+      <div v-if="roomPhase === 'game' && question && !summaryData">
+        <div class="question-panel">
+          <p class="question-kicker">Current Question</p>
           <p class="question-text mb-4" v-html="question.question"></p>
         </div>
         <div class="buttons">
@@ -109,10 +127,10 @@
 
       <div v-if="roomPhase === 'game'" class="mt-4">
         <div class="scores-panel">
-        <p class="label control-label">Scores:</p>
-        <ul class="score-list mb-0">
-          <li v-for="player in players" :key="player.id">{{ player.name }}: {{ player.score }}</li>
-        </ul>
+          <p class="label control-label">Scores:</p>
+          <ul class="score-list mb-0">
+            <li v-for="player in players" :key="player.id">{{ player.name }}: {{ player.score }}</li>
+          </ul>
         </div>
       </div>
     </div>
@@ -120,6 +138,7 @@
 </template>
 
 <script>
+import * as d3 from 'd3'
 import { getSocket } from '../socket'
 
 const socket = getSocket()
@@ -148,7 +167,8 @@ export default {
       questionMode: '10',
       customQuestionCount: '10',
       selectedCategory: '',
-      categoryName: 'Any Category'
+      categoryName: 'Any Category',
+      summaryData: null
     }
   },
   computed: {
@@ -215,7 +235,7 @@ export default {
       socket.emit('start-game', this.code)
     },
     submitAnswer(answer) {
-      if (this.hasAnsweredCurrentQuestion) return
+      if (this.hasAnsweredCurrentQuestion || this.summaryData) return
 
       this.hasAnsweredCurrentQuestion = true
       socket.emit('submit-answer', { code: this.code, answer })
@@ -226,6 +246,92 @@ export default {
     leaveRoom() {
       socket.emit('leave-room', this.code)
       this.$router.push('/')
+    },
+    renderSummaryChart() {
+      const container = this.$refs.summaryChartContainer
+      if (!container || !this.summaryData) return
+
+      d3.select(container).selectAll('*').remove()
+
+      const data = this.summaryData.options.map((option) => ({
+        answer: option.answer,
+        count: option.count,
+        isCorrect: option.isCorrect
+      }))
+
+      const width = Math.max(container.clientWidth || 520, 320)
+      const height = 360
+      const margin = { top: 24, right: 24, bottom: 90, left: 52 }
+
+      const svg = d3
+        .select(container)
+        .append('svg')
+        .attr('viewBox', `0 0 ${width} ${height}`)
+        .attr('class', 'results-chart-svg')
+        .attr('role', 'img')
+        .attr('aria-label', 'Answer breakdown chart for the current question')
+
+      const x = d3
+        .scaleBand()
+        .domain(data.map((option) => option.answer))
+        .range([margin.left, width - margin.right])
+        .padding(0.28)
+
+      const y = d3
+        .scaleLinear()
+        .domain([0, Math.max(d3.max(data, (option) => option.count) || 0, 1)])
+        .nice()
+        .range([height - margin.bottom, margin.top])
+
+      svg
+        .append('g')
+        .attr('transform', `translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x).tickSize(0))
+        .call((group) => group.selectAll('path, line').attr('stroke', '#cbd5e1'))
+        .call((group) => group.selectAll('text').attr('fill', '#64748b').style('font-size', '12px'))
+        .call((group) =>
+          group
+            .selectAll('text')
+            .attr('transform', 'rotate(-18)')
+            .style('text-anchor', 'end')
+        )
+
+      svg
+        .append('g')
+        .attr('transform', `translate(${margin.left},0)`)
+        .call(d3.axisLeft(y).ticks(4).tickSizeOuter(0))
+        .call((group) => group.selectAll('path, line').attr('stroke', '#cbd5e1'))
+        .call((group) => group.selectAll('text').attr('fill', '#64748b').style('font-size', '12px'))
+
+      svg
+        .append('g')
+        .selectAll('rect')
+        .data(data)
+        .join('rect')
+        .attr('x', (option) => x(option.answer))
+        .attr('y', height - margin.bottom)
+        .attr('rx', 10)
+        .attr('ry', 10)
+        .attr('width', x.bandwidth())
+        .attr('height', 0)
+        .attr('fill', (option) => (option.isCorrect ? '#16a34a' : '#dc2626'))
+        .transition()
+        .duration(700)
+        .attr('y', (option) => y(option.count))
+        .attr('height', (option) => height - margin.bottom - y(option.count))
+
+      svg
+        .append('g')
+        .selectAll('text')
+        .data(data)
+        .join('text')
+        .attr('x', (option) => (x(option.answer) || 0) + x.bandwidth() / 2)
+        .attr('y', (option) => y(option.count) - 10)
+        .attr('text-anchor', 'middle')
+        .attr('fill', '#1f2937')
+        .style('font-size', '13px')
+        .style('font-weight', '700')
+        .text((option) => `${option.count} player${option.count === 1 ? '' : 's'}`)
     },
     handleRoomState(room) {
       if (room.code !== this.code) return
@@ -259,6 +365,7 @@ export default {
         this.total = 0
         this.answeredPlayers = 0
         this.hasAnsweredCurrentQuestion = false
+        this.summaryData = null
       }
 
       if (room.phase === 'game' && !this.question) {
@@ -284,6 +391,16 @@ export default {
       this.total = total
       this.answeredPlayers = answeredPlayers
       this.hasAnsweredCurrentQuestion = false
+      this.summaryData = null
+      if (this.$refs.summaryChartContainer) {
+        d3.select(this.$refs.summaryChartContainer).selectAll('*').remove()
+      }
+    },
+    handleQuestionSummary(summary) {
+      this.summaryData = summary
+      this.$nextTick(() => {
+        this.renderSummaryChart()
+      })
     },
     handleAnswerProgress({ answeredPlayers }) {
       this.answeredPlayers = answeredPlayers
@@ -311,6 +428,7 @@ export default {
     socket.on('room-state', this.handleRoomState)
     socket.on('return-to-lobby', this.handleReturnToLobby)
     socket.on('question-updated', this.handleQuestionUpdated)
+    socket.on('question-summary', this.handleQuestionSummary)
     socket.on('answer-progress', this.handleAnswerProgress)
     socket.on('score-update', this.handleScoreUpdate)
     socket.on('game-over', this.handleGameOver)
@@ -323,6 +441,7 @@ export default {
     socket.off('room-state', this.handleRoomState)
     socket.off('return-to-lobby', this.handleReturnToLobby)
     socket.off('question-updated', this.handleQuestionUpdated)
+    socket.off('question-summary', this.handleQuestionSummary)
     socket.off('answer-progress', this.handleAnswerProgress)
     socket.off('score-update', this.handleScoreUpdate)
     socket.off('game-over', this.handleGameOver)

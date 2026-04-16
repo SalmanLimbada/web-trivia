@@ -10,6 +10,7 @@ const io = new Server(server, { cors: { origin: '*' } })
 const PORT = 3000
 const DEFAULT_QUESTION_COUNT = 10
 const MAX_QUESTION_COUNT = 50
+const QUESTION_SUMMARY_DELAY_MS = 3000
 
 app.use(cors())
 app.use(express.json())
@@ -141,9 +142,34 @@ function emitCurrentQuestion(code) {
   io.to(code).emit('score-update', room.players)
 }
 
+function emitQuestionSummary(code) {
+  const room = rooms[code]
+  if (!room) return
+
+  const current = room.questions[room.currentQuestion]
+  if (!current) return
+
+  const options = [...current.incorrect_answers, current.correct_answer].map((answer) => ({
+    answer,
+    count: room.answerCounts[answer] || 0,
+    isCorrect: answer === current.correct_answer
+  }))
+
+  io.to(code).emit('question-summary', {
+    question: current.question,
+    correctAnswer: current.correct_answer,
+    options
+  })
+}
+
 function resetRoomToLobby(code, nextSettings = null) {
   const room = rooms[code]
   if (!room) return
+
+  if (room.summaryTimeout) {
+    clearTimeout(room.summaryTimeout)
+    room.summaryTimeout = null
+  }
 
   if (nextSettings) {
     room.settings = normalizeSettings(nextSettings)
@@ -170,7 +196,11 @@ function finishGame(code) {
   const room = rooms[code]
   if (!room) return
 
+  if (room.summaryTimeout) {
+    clearTimeout(room.summaryTimeout)
+  }
   room.phase = 'results'
+  room.summaryTimeout = null
   room.finalPlayers = room.players.map((player) => ({ ...player }))
   room.questions = []
   room.currentQuestion = 0
@@ -183,8 +213,10 @@ function advanceQuestion(code) {
   const room = rooms[code]
   if (!room) return
 
+  room.summaryTimeout = null
   room.currentQuestion += 1
   room.answeredPlayers = []
+  room.answerCounts = {}
 
   if (room.currentQuestion >= room.questions.length) {
     finishGame(code)
@@ -197,6 +229,17 @@ function advanceQuestion(code) {
 
 function assignNextHost(room) {
   room.hostId = room.players.length > 0 ? room.players[0].id : null
+}
+
+function revealQuestionResults(code) {
+  const room = rooms[code]
+  if (!room || room.summaryTimeout) return
+
+  emitQuestionSummary(code)
+
+  room.summaryTimeout = setTimeout(() => {
+    advanceQuestion(code)
+  }, QUESTION_SUMMARY_DELAY_MS)
 }
 
 function removePlayerFromRoom(code, socketId) {
@@ -218,7 +261,7 @@ function removePlayerFromRoom(code, socketId) {
   }
 
   if (room.phase === 'game' && room.answeredPlayers.length >= room.players.length) {
-    advanceQuestion(code)
+    revealQuestionResults(code)
     return
   }
 
@@ -239,10 +282,12 @@ io.on('connection', (socket) => {
       questions: [],
       currentQuestion: 0,
       answeredPlayers: [],
+      answerCounts: {},
       finalPlayers: [],
       settings,
       phase: 'lobby',
-      hostId: socket.id
+      hostId: socket.id,
+      summaryTimeout: null
     }
 
     socket.data.roomCode = code
@@ -307,6 +352,7 @@ io.on('connection', (socket) => {
       room.questions = questions
       room.currentQuestion = 0
       room.answeredPlayers = []
+      room.answerCounts = {}
       room.finalPlayers = []
       room.phase = 'game'
       room.players = room.players.map((player) => ({
@@ -357,6 +403,7 @@ io.on('connection', (socket) => {
       room.questions = questions
       room.currentQuestion = 0
       room.answeredPlayers = []
+      room.answerCounts = {}
       room.finalPlayers = []
       room.phase = 'game'
       room.players = room.players.map((player) => ({
@@ -389,6 +436,9 @@ io.on('connection', (socket) => {
         answeredPlayers: room.answeredPlayers.length,
         totalPlayers: room.players.length
       })
+      if (room.summaryTimeout) {
+        emitQuestionSummary(code)
+      }
     }
   })
 
@@ -408,11 +458,12 @@ io.on('connection', (socket) => {
     }
 
     room.answeredPlayers.push(socket.id)
+    room.answerCounts[answer] = (room.answerCounts[answer] || 0) + 1
     io.to(code).emit('score-update', room.players)
     emitAnswerProgress(code)
 
     if (room.answeredPlayers.length >= room.players.length) {
-      advanceQuestion(code)
+      revealQuestionResults(code)
     }
   })
 

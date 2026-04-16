@@ -1,7 +1,15 @@
 <template>
   <div class="view-wrap">
+    <p class="eyebrow">Final Standings</p>
     <h1 class="title has-text-centered page-title">Results</h1>
+    <p class="page-lead has-text-centered">
+      The round is over. Check the final ranking and start the next game when everyone is ready.
+    </p>
     <div class="box results-card">
+      <p v-if="sortedPlayers.length" class="winner-banner">
+        Winner: {{ sortedPlayers[0].name }}
+      </p>
+
       <table class="table is-fullwidth results-table">
         <thead>
           <tr>
@@ -19,7 +27,7 @@
 
       <p v-if="message" class="status-note has-text-centered mb-4">{{ message }}</p>
 
-      <div class="buttons">
+      <div class="buttons action-stack">
         <button
           v-if="isHost"
           class="button is-primary is-fullwidth"
