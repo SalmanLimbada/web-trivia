@@ -1,57 +1,77 @@
-# Web Trivia
 
-This README is only for the current state of the project so far.
-It is here to help run what has been built up to this point.
+## Current Status
 
-## What is working right now
+Project is functional end-to-end:
 
-- Vue frontend
-- Node/Express backend
-- Socket.IO room system
-- Multiplayer trivia flow
+- Home screen for create/join room flow
+- Multiplayer room system with host controls
+- Trivia gameplay with score tracking
+- D3 answer breakdown chart between questions
+- Results page with restart options
+- Light/Dark mode toggle
+- Ambient background music with volume slider
+- jQuery micro-animations across pages
 
-## Before you run it
+## Tech Stack
 
-Make sure you have Node.js installed.
+- Frontend: Vue 3, Vue Router, Bulma, D3
+- Backend: Node.js, Express, Socket.IO
+- Data source: OpenTDB web service
+- Additional tech: Web Audio API (music + volume control)
 
-## First-time setup
+## Setup
 
-Open a terminal in the project root and run:
+Requirements:
+
+- Node.js 20+ recommended
+
+Install dependencies:
 
 ```bash
 npm install
-```
-
-Then go into the `client` folder and run:
-
-```bash
+cd client
 npm install
 ```
 
-## How to run it
+## Run Locally
 
-1. In the project root, start the server:
+1. Start backend from project root:
 
 ```bash
 node server/index.js
 ```
 
-2. In a second terminal, go to the `client` folder and start the Vue app:
+2. Start frontend in another terminal:
 
 ```bash
+cd client
 npm run dev
 ```
 
-3. Open the local Vite link shown in the terminal.
-It is usually `http://localhost:5173`.
+3. Open the Vite URL (usually http://localhost:5173).
 
-## Notes
+## Quick Test Checklist
 
-- The backend runs on `http://localhost:3000`
-- The frontend connects to that server with Socket.IO
-- To test multiplayer, open the app in two browser windows or on two devices on the same network
+1. Create a room and join from another browser tab.
+2. Host changes question count/category and starts game.
+3. Answer questions from both clients and verify score updates.
+4. Confirm summary chart shows green correct bar and red incorrect bars.
+5. Confirm results page shows winner and restart options.
+6. Confirm Dark/Light mode works.
+7. Confirm music volume slider works (autoplay may require first interaction due to browser policy).
+8. Confirm Enter key works in Home inputs (name/code/custom count).
 
-## Important
+## Known Notes
 
-This is not the final project README.
-It only explains how to run the project in its current state.
+- Browser audio autoplay restrictions vary. If music does not start immediately, first click/keypress unlocks it.
+- jQuery is currently loaded through CDN in client/index.html.
+
+## Still To Finish
+
+- Final polishing pass (text copy, tiny UX fixes, responsive checks)
+- Final required docs cleanup:
+	- readme.txt (submission-facing run instructions)
+	- contributions.txt (who did what)
+	- ai-prompts.txt updates
+	- group_members.html verification
+- Final bug sweep and submission zip validation
