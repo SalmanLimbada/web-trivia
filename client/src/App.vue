@@ -1,3 +1,5 @@
 <template>
-  <RouterView />
+  <main class="app-shell">
+    <RouterView />
+  </main>
 </template>

@@ -1,11 +1,11 @@
 <template>
-  <div class="container mt-6">
-    <div class="box">
+  <div class="view-wrap">
+    <div class="box game-card">
       <div class="level">
         <div class="level-left">
           <div>
-            <p class="subtitle mb-1">Room: <strong>{{ code }}</strong></p>
-            <p class="is-size-7 has-text-grey">
+            <p class="room-chip">Room: {{ code }}</p>
+            <p class="is-size-7 subtle-text mt-2">
               {{ roomSettings.questionCount }} questions
               <span v-if="categoryName"> | {{ categoryName }}</span>
             </p>
@@ -24,11 +24,11 @@
       </div>
 
       <div v-if="roomPhase === 'lobby'">
-        <p class="has-text-centered mb-4">Waiting in the lobby...</p>
+        <p class="status-note has-text-centered mb-4">Waiting in the lobby...</p>
 
         <div v-if="isHost" class="mb-5">
           <div class="field">
-            <label class="label">Question Count</label>
+            <label class="label control-label">Question Count</label>
             <div class="select is-fullwidth">
               <select v-model="questionMode">
                 <option value="5">5 questions</option>
@@ -41,7 +41,7 @@
           </div>
 
           <div v-if="questionMode === 'custom'" class="field">
-            <label class="label">Custom Question Count</label>
+            <label class="label control-label">Custom Question Count</label>
             <input
               class="input"
               type="number"
@@ -53,7 +53,7 @@
           </div>
 
           <div class="field">
-            <label class="label">Category</label>
+            <label class="label control-label">Category</label>
             <div class="select is-fullwidth">
               <select v-model="selectedCategory">
                 <option value="">Any Category</option>
@@ -70,20 +70,24 @@
           </div>
         </div>
 
-        <p v-else class="has-text-centered has-text-grey mb-4">
+        <p v-else class="settings-note has-text-centered mb-4">
           Waiting for the host to choose settings and start the game.
         </p>
 
-        <p class="label">Players:</p>
-        <ul class="mb-4">
+        <div class="players-panel">
+        <p class="label control-label">Players:</p>
+        <ul class="player-list mb-0">
           <li v-for="player in players" :key="player.id">
             {{ player.name }}<span v-if="player.id === hostId"> (host)</span>
           </li>
         </ul>
+        </div>
       </div>
 
       <div v-if="roomPhase === 'game' && question">
-        <p class="label mb-4" v-html="question.question"></p>
+        <div class="question-panel">
+          <p class="question-text mb-4" v-html="question.question"></p>
+        </div>
         <div class="buttons">
           <button
             v-for="answer in answers"
@@ -98,16 +102,18 @@
         <p v-if="hasAnsweredCurrentQuestion" class="has-text-centered has-text-grey mt-3">
           Answer locked in. Waiting for the other players...
         </p>
-        <p v-else class="has-text-centered has-text-grey mt-3">
+        <p v-else class="has-text-centered subtle-text mt-3">
           {{ answeredPlayers }} of {{ players.length }} players have answered
         </p>
       </div>
 
       <div v-if="roomPhase === 'game'" class="mt-4">
-        <p class="label">Scores:</p>
-        <ul>
+        <div class="scores-panel">
+        <p class="label control-label">Scores:</p>
+        <ul class="score-list mb-0">
           <li v-for="player in players" :key="player.id">{{ player.name }}: {{ player.score }}</li>
         </ul>
+        </div>
       </div>
     </div>
   </div>

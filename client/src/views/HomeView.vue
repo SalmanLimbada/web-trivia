@@ -1,14 +1,14 @@
 <template>
-  <div class="container mt-6">
-    <h1 class="title has-text-centered">Web Trivia</h1>
-    <div class="box" style="max-width: 480px; margin: auto">
+  <div class="view-wrap">
+    <h1 class="title has-text-centered page-title">Web Trivia</h1>
+    <div class="box hero-card">
       <div class="field">
-        <label class="label">Your Name</label>
+        <label class="label control-label">Your Name</label>
         <input class="input" type="text" v-model.trim="playerName" placeholder="Enter your name" />
       </div>
 
       <div class="field">
-        <label class="label">Question Count</label>
+        <label class="label control-label">Question Count</label>
         <div class="select is-fullwidth">
           <select v-model="questionMode">
             <option value="5">5 questions</option>
@@ -21,7 +21,7 @@
       </div>
 
       <div v-if="questionMode === 'custom'" class="field">
-        <label class="label">Custom Question Count</label>
+        <label class="label control-label">Custom Question Count</label>
         <input
           class="input"
           type="number"
@@ -30,11 +30,11 @@
           v-model="customQuestionCount"
           placeholder="Enter a number from 1 to 50"
         />
-        <p class="help">OpenTDB supports up to 50 questions per request.</p>
+        <p class="help field-help">OpenTDB supports up to 50 questions per request.</p>
       </div>
 
       <div class="field">
-        <label class="label">Category</label>
+        <label class="label control-label">Category</label>
         <div class="select is-fullwidth">
           <select v-model="selectedCategory">
             <option value="">Any Category</option>
@@ -58,7 +58,7 @@
         </div>
       </div>
 
-      <p v-if="loadingCategories" class="has-text-grey mb-2">Loading categories...</p>
+      <p v-if="loadingCategories" class="subtle-text mb-2">Loading categories...</p>
       <p v-if="error" class="has-text-danger">{{ error }}</p>
     </div>
   </div>

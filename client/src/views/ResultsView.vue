@@ -1,8 +1,8 @@
 <template>
-  <div class="container mt-6">
-    <h1 class="title has-text-centered">Results</h1>
-    <div class="box">
-      <table class="table is-fullwidth">
+  <div class="view-wrap">
+    <h1 class="title has-text-centered page-title">Results</h1>
+    <div class="box results-card">
+      <table class="table is-fullwidth results-table">
         <thead>
           <tr>
             <th>Player</th>
@@ -17,7 +17,7 @@
         </tbody>
       </table>
 
-      <p v-if="message" class="has-text-centered has-text-grey mb-4">{{ message }}</p>
+      <p v-if="message" class="status-note has-text-centered mb-4">{{ message }}</p>
 
       <div class="buttons">
         <button
