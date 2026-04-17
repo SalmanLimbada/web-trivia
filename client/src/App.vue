@@ -2,10 +2,16 @@
   <main class="app-shell">
     <div class="app-controls" role="group" aria-label="App display and music controls">
       <button class="control-pill" type="button" @click="toggleTheme">
-        {{ theme === 'dark' ? 'Light Mode' : 'Dark Mode' }}
+        <SvgIcon
+          :name="theme === 'dark' ? 'sun' : 'moon'"
+          size="sm"
+          :aria-label="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+        />
+        <span class="control-pill-label">{{ theme === 'dark' ? 'Light' : 'Dark' }}</span>
       </button>
       <div class="music-control" aria-label="Background music volume">
-        <label class="music-label" for="music-volume">Music {{ Math.round(musicVolume * 100) }}%</label>
+        <SvgIcon name="volume" size="sm" aria-label="Music volume" />
+        <label class="music-label" for="music-volume">{{ Math.round(musicVolume * 100) }}%</label>
         <input
           id="music-volume"
           class="music-slider"
@@ -18,20 +24,25 @@
         />
       </div>
     </div>
-    <RouterView />
+
+    <RouterView v-slot="{ Component }">
+      <Transition name="route-fade" mode="out-in">
+        <component :is="Component" />
+      </Transition>
+    </RouterView>
   </main>
 </template>
 
 <script>
-export default {
-  data() {
-    const savedVolume = Number.parseInt(localStorage.getItem('web-trivia-music-volume') || '18', 10)
-    const normalizedVolume = Number.isNaN(savedVolume) ? 0.18 : Math.min(Math.max(savedVolume, 0), 100) / 100
+import { mapState, mapActions } from 'pinia'
+import { useUiStore } from './stores/ui'
+import SvgIcon from './components/SvgIcon.vue'
 
+export default {
+  components: { SvgIcon },
+  data() {
     return {
-      theme: localStorage.getItem('web-trivia-theme') || 'light',
       isMusicEnabled: false,
-      musicVolume: normalizedVolume,
       audioContext: null,
       masterGain: null,
       musicIntervalId: null,
@@ -39,18 +50,18 @@ export default {
       unlockHandler: null
     }
   },
+  computed: {
+    ...mapState(useUiStore, ['theme', 'musicVolume'])
+  },
+  watch: {
+    musicVolume() {
+      this.applyMusicVolume()
+    }
+  },
   methods: {
-    applyTheme() {
-      document.documentElement.setAttribute('data-theme', this.theme)
-      localStorage.setItem('web-trivia-theme', this.theme)
-    },
-    toggleTheme() {
-      this.theme = this.theme === 'dark' ? 'light' : 'dark'
-      this.applyTheme()
-    },
+    ...mapActions(useUiStore, ['toggleTheme', 'applyTheme', 'setVolume']),
     ensureAudioContext() {
       if (this.audioContext) return true
-
       const AudioContextClass = window.AudioContext || window.webkitAudioContext
       if (!AudioContextClass) return false
 
@@ -62,7 +73,6 @@ export default {
     },
     applyMusicVolume() {
       if (!this.masterGain || !this.audioContext) return
-
       const gainValue = this.musicVolume * 0.3
       this.masterGain.gain.setTargetAtTime(gainValue, this.audioContext.currentTime, 0.04)
     },
@@ -70,14 +80,11 @@ export default {
       const nextVolume = Number.parseInt(event.target.value, 10)
       if (Number.isNaN(nextVolume)) return
 
-      this.musicVolume = Math.min(Math.max(nextVolume, 0), 100) / 100
-      localStorage.setItem('web-trivia-music-volume', String(Math.round(this.musicVolume * 100)))
+      this.setVolume(Math.min(Math.max(nextVolume, 0), 100) / 100)
       this.applyMusicVolume()
 
       if (!this.isMusicEnabled && this.musicVolume > 0) {
-        this.startMusic().catch(() => {
-          this.setupAutoplayFallback()
-        })
+        this.startMusic().catch(() => this.setupAutoplayFallback())
       }
     },
     playTone(frequency, startAt, duration, type = 'sine', gain = 0.07) {
@@ -150,7 +157,6 @@ export default {
         window.clearInterval(this.musicIntervalId)
         this.musicIntervalId = null
       }
-
       this.isMusicEnabled = false
     },
     setupAutoplayFallback() {
@@ -163,7 +169,7 @@ export default {
             this.removeUnlockListeners()
           }
         } catch (error) {
-          // Keep listeners active until the browser allows playback.
+          // keep listeners active until the browser allows playback
         }
       }
 
@@ -182,15 +188,11 @@ export default {
       this.unlockHandler = null
     },
     async attemptAutoPlayMusic() {
-      if (this.musicVolume <= 0) {
-        return
-      }
+      if (this.musicVolume <= 0) return
 
       try {
         const started = await this.startMusic()
-        if (!started) {
-          this.setupAutoplayFallback()
-        }
+        if (!started) this.setupAutoplayFallback()
       } catch (error) {
         this.setupAutoplayFallback()
       }

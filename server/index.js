@@ -11,6 +11,7 @@ const PORT = 3000
 const DEFAULT_QUESTION_COUNT = 10
 const MAX_QUESTION_COUNT = 50
 const QUESTION_SUMMARY_DELAY_MS = 3000
+const QUESTION_TIME_LIMIT_SECONDS = 20
 
 app.use(cors())
 app.use(express.json())
@@ -31,34 +32,35 @@ function parseCategoryId(rawCategoryId) {
   return Number.isNaN(categoryId) ? null : categoryId
 }
 
-function normalizeSettings({ questionCount, categoryId }) {
+function parseDifficulty(raw) {
+  const allowed = ['easy', 'medium', 'hard']
+  return allowed.includes(raw) ? raw : null
+}
+
+function normalizeSettings({ questionCount, categoryId, difficulty }) {
   return {
     questionCount: parseQuestionCount(questionCount),
-    categoryId: parseCategoryId(categoryId)
+    categoryId: parseCategoryId(categoryId),
+    difficulty: parseDifficulty(difficulty)
   }
 }
 
-function getQuestionApiUrl({ amount, categoryId = null }) {
+function getQuestionApiUrl({ amount, categoryId = null, difficulty = null }) {
   const params = new URLSearchParams({
     amount: String(amount),
     type: 'multiple'
   })
 
-  if (categoryId) {
-    params.set('category', String(categoryId))
-  }
+  if (categoryId) params.set('category', String(categoryId))
+  if (difficulty) params.set('difficulty', difficulty)
 
   return `https://opentdb.com/api.php?${params.toString()}`
 }
 
-async function fetchQuestions({ amount, categoryId = null }) {
-  const response = await fetch(getQuestionApiUrl({ amount, categoryId }))
+async function fetchQuestions({ amount, categoryId = null, difficulty = null }) {
+  const response = await fetch(getQuestionApiUrl({ amount, categoryId, difficulty }))
   const data = await response.json()
-
-  if (!data.results || data.results.length === 0) {
-    throw new Error('No questions returned')
-  }
-
+  if (!data.results || data.results.length === 0) throw new Error('No questions returned')
   return data.results
 }
 
@@ -133,13 +135,23 @@ function emitCurrentQuestion(code) {
   const room = rooms[code]
   if (!room || room.questions.length === 0) return
 
+  room.questionStartedAt = Date.now()
+
   io.to(code).emit('question-updated', {
     question: room.questions[room.currentQuestion],
     current: room.currentQuestion + 1,
     total: room.questions.length,
-    answeredPlayers: room.answeredPlayers.length
+    answeredPlayers: room.answeredPlayers.length,
+    timeLimitSeconds: QUESTION_TIME_LIMIT_SECONDS
   })
   io.to(code).emit('score-update', room.players)
+
+  if (room.questionTimeout) clearTimeout(room.questionTimeout)
+  room.questionTimeout = setTimeout(() => {
+    if (room.phase === 'game' && !room.summaryTimeout) {
+      revealQuestionResults(code)
+    }
+  }, QUESTION_TIME_LIMIT_SECONDS * 1000)
 }
 
 function emitQuestionSummary(code) {
@@ -180,8 +192,7 @@ function resetRoomToLobby(code, nextSettings = null) {
   room.currentQuestion = 0
   room.answeredPlayers = []
   room.finalPlayers = room.players.map((player) => ({
-    ...player,
-    score: 0
+    ...player
   }))
   room.players = room.players.map((player) => ({
     ...player,
@@ -197,7 +208,8 @@ function finishGame(code) {
   if (!room) return
 
   if (room.summaryTimeout) {
-    clearTimeout(room.summaryTimeout)
+    clearTimeout(room.summaryTimeout);
+    room.questionTimeout = null
   }
   room.phase = 'results'
   room.summaryTimeout = null
@@ -235,6 +247,11 @@ function revealQuestionResults(code) {
   const room = rooms[code]
   if (!room || room.summaryTimeout) return
 
+  if (room.questionTimeout) {
+    clearTimeout(room.questionTimeout)
+    room.questionTimeout = null
+  }
+
   emitQuestionSummary(code)
 
   room.summaryTimeout = setTimeout(() => {
@@ -260,9 +277,8 @@ function removePlayerFromRoom(code, socketId) {
     assignNextHost(room)
   }
 
-  if (room.phase === 'game' && room.answeredPlayers.length >= room.players.length) {
+  if (room.phase === 'game' && !room.summaryTimeout && room.answeredPlayers.length >= room.players.length) {
     revealQuestionResults(code)
-    return
   }
 
   emitRoomPlayers(code)
@@ -273,9 +289,9 @@ function removePlayerFromRoom(code, socketId) {
 io.on('connection', (socket) => {
   console.log('user connected:', socket.id)
 
-  socket.on('create-room', ({ playerName, questionCount, categoryId }) => {
+  socket.on('create-room', ({ playerName, questionCount, categoryId, difficulty }) => {
     const code = Math.random().toString(36).substring(2, 7).toUpperCase()
-    const settings = normalizeSettings({ questionCount, categoryId })
+    const settings = normalizeSettings({ questionCount, categoryId, difficulty })
 
     rooms[code] = {
       players: [{ id: socket.id, name: playerName, score: 0 }],
@@ -313,7 +329,7 @@ io.on('connection', (socket) => {
     emitAnswerProgress(code)
   })
 
-  socket.on('update-room-settings', ({ code, questionCount, categoryId }) => {
+  socket.on('update-room-settings', ({ code, questionCount, categoryId, difficulty }) => {
     const room = rooms[code]
 
     if (!room) {
@@ -328,7 +344,7 @@ io.on('connection', (socket) => {
       return socket.emit('error', 'Room settings can only be changed before the game starts')
     }
 
-    room.settings = normalizeSettings({ questionCount, categoryId })
+    room.settings = normalizeSettings({ questionCount, categoryId, difficulty })
     emitRoomState(code)
   })
 
@@ -346,7 +362,8 @@ io.on('connection', (socket) => {
 
       const questions = await fetchQuestions({
         amount: room.settings.questionCount,
-        categoryId: room.settings.categoryId
+        categoryId: room.settings.categoryId,
+        difficulty: room.settings.difficulty
       })
 
       room.questions = questions
@@ -380,7 +397,9 @@ io.on('connection', (socket) => {
       return socket.emit('error', 'Only the host can restart the room')
     }
 
-    resetRoomToLobby(code, { questionCount, categoryId })
+    const nextSettings = questionCount === undefined && categoryId === undefined ? null : { questionCount, categoryId }
+
+    resetRoomToLobby(code, nextSettings)
   })
 
   socket.on('restart-same-settings', async (code) => {
@@ -397,7 +416,8 @@ io.on('connection', (socket) => {
 
       const questions = await fetchQuestions({
         amount: room.settings.questionCount,
-        categoryId: room.settings.categoryId
+        categoryId: room.settings.categoryId,
+        difficulty: room.settings.difficulty
       })
 
       room.questions = questions
@@ -445,7 +465,7 @@ io.on('connection', (socket) => {
   socket.on('submit-answer', ({ code, answer }) => {
     const room = rooms[code]
 
-    if (!room || room.phase !== 'game') return
+    if (!room || room.phase !== 'game' || room.summaryTimeout) return
 
     const current = room.questions[room.currentQuestion]
     const player = room.players.find((entry) => entry.id === socket.id)

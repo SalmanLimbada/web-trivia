@@ -338,8 +338,8 @@ select {
   font-weight: 500;
 }
 
-.scores-panel .score-list li + li,
-.players-panel .player-list li + li {
+.scores-panel .score-list li+li,
+.players-panel .player-list li+li {
   border-top: 1px dashed #e3edf8;
 }
 
@@ -501,11 +501,11 @@ select {
   padding: 1rem 1.1rem;
 }
 
-.results-table thead th + th {
+.results-table thead th+th {
   border-left: 2px solid #4f6d8f;
 }
 
-.results-table tbody td + td {
+.results-table tbody td+td {
   border-left: 2px solid #c4d8ee;
 }
 
@@ -644,6 +644,7 @@ select {
 }
 
 @keyframes shake-x {
+
   0%,
   100% {
     transform: translateX(0);
@@ -737,4 +738,104 @@ select {
   .results-chart {
     min-height: 300px;
   }
+}
+
+.question-timer {
+  margin-bottom: 1rem;
+}
+
+.timer-label {
+  margin-bottom: 0.35rem;
+  color: var(--muted-color);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.timer-bar-outer {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: #e4edf8;
+  overflow: hidden;
+}
+
+.timer-bar-inner {
+  height: 100%;
+  background: linear-gradient(135deg, #18a76e, #0f8a5f);
+  transition: width 1s linear;
+  border-radius: 999px;
+}
+
+.question-timer.is-critical .timer-bar-inner {
+  background: linear-gradient(135deg, #ff6b35, #e04e1b);
+}
+
+.question-timer.is-critical .timer-label {
+  color: #b11616;
+}
+
+.route-fade-enter-active,
+.route-fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.route-fade-enter-from {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+.route-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.phase-fade-enter-active,
+.phase-fade-leave-active {
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.phase-fade-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.phase-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.notice-slide-enter-active,
+.notice-slide-leave-active {
+  transition: opacity 0.24s ease, max-height 0.24s ease, transform 0.24s ease;
+  overflow: hidden;
+}
+
+.notice-slide-enter-from,
+.notice-slide-leave-to {
+  opacity: 0;
+  max-height: 0;
+  transform: translateY(-6px);
+}
+
+.notice-slide-enter-to,
+.notice-slide-leave-from {
+  max-height: 200px;
+}
+
+.row-stagger-enter-active {
+  transition: opacity 0.32s ease, transform 0.32s ease;
+  transition-delay: calc(var(--row-idx, 0) * 90ms);
+}
+
+.row-stagger-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.row-stagger-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.row-stagger-leave-to {
+  opacity: 0;
 }

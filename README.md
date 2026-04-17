@@ -1,4 +1,3 @@
-
 ## Current Status
 
 Project is functional end-to-end:
