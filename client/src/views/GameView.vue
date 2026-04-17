@@ -43,6 +43,7 @@
             </div>
 
             <SettingsForm
+              class="settings-form-block"
               v-model:questionMode="questionMode"
               v-model:customQuestionCount="customQuestionCount"
               v-model:selectedCategory="selectedCategory"
@@ -50,7 +51,7 @@
               :categories="categories"
             />
 
-            <div class="buttons">
+            <div class="buttons settings-actions">
               <button class="button is-link is-light" @click="saveSettings">Save Settings</button>
               <button class="button is-success" @click="startGame">Start Game</button>
             </div>

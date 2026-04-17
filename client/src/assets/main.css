@@ -445,6 +445,14 @@ select {
   gap: 0.7rem;
 }
 
+.settings-form-block {
+  margin-bottom: 0.8rem;
+}
+
+.settings-actions {
+  margin-top: 0.25rem;
+}
+
 .buttons .button {
   width: 100%;
 }
