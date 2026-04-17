@@ -13,3 +13,9 @@ how can i stop sending too many socket events in my trivia server and only send 
 what server logs should i add in socket.io so it's easier to debug room issues during create, join, and reconnect
 
 when someone refreshes mid game sometimes state gets weird, what's the first thing i should check
+
+i'm using the opentdb api to fetch questions for a trivia website, whats a better way to structure the url requests
+
+Using the opentdb api, can i set it up in a website to have randomized questions from multiple categories displayed in a random order 
+
+what are some apis i could use if i want to generate some background audio that changes in a game website
