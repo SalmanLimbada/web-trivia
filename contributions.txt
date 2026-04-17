@@ -1,0 +1,31 @@
+All team members helped with debugging and testing for the specific parts they worked on.
+
+Salman Limbada
+- Project setup and overall coordination
+- Express server setup and room/game flow wiring
+- Core frontend/backend integration
+- Final bug fixes and feature polish
+
+Abdellatif Osman
+- Project concept and early planning
+- OpenTDB/category feature support
+- Background music support (Web Audio API)
+- Recorded demo video, prepared the script, and submitted the final folder
+
+Kailash Subash Nair
+- SVG and visual feature support
+- Component refactor and Vue architecture improvements (shared components/state flow)
+- Bug fixing and code review
+- Timer/difficulty and transition/icon feature integration support
+
+Imran Mojaddedi
+- Home page feature support
+- Game page feature support
+- jQuery interaction and animation support
+- Bulma styling/layout support
+
+Hamuddin Khan
+- Results/restart flow support
+- D3 chart support
+- Dark mode/theme support
+- Gameplay and UI flow support

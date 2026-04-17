@@ -1,76 +1,86 @@
-## Current Status
+# Web Trivia
 
-Project is functional end-to-end:
+Team README for development and quick setup.
 
-- Home screen for create/join room flow
-- Multiplayer room system with host controls
-- Trivia gameplay with score tracking
-- D3 answer breakdown chart between questions
-- Results page with restart options
-- Light/Dark mode toggle
-- Ambient background music with volume slider
-- jQuery micro-animations across pages
+## Requirements
+- Node.js 20+ (recommended)
+- npm
+- Internet connection (OpenTDB API + jQuery CDN)
 
-## Tech Stack
+## Install
 
-- Frontend: Vue 3, Vue Router, Bulma, D3
-- Backend: Node.js, Express, Socket.IO
-- Data source: OpenTDB web service
-- Additional tech: Web Audio API (music + volume control)
-
-## Setup
-
-Requirements:
-
-- Node.js 20+ recommended
-
-Install dependencies:
+From project root:
 
 ```bash
 npm install
+```
+
+Then install frontend dependencies:
+
+```bash
 cd client
 npm install
 ```
 
-## Run Locally
+Important:
+- Frontend dependencies like `pinia` are in `client/package.json`.
+- If you skip `client/npm install`, the app can fail on startup.
 
-1. Start backend from project root:
+## Run
+
+Use 2 terminals.
+
+Terminal A (project root):
 
 ```bash
 node server/index.js
 ```
 
-2. Start frontend in another terminal:
+Terminal B:
 
 ```bash
 cd client
 npm run dev
 ```
 
-3. Open the Vite URL (usually http://localhost:5173).
+Open the Vite URL shown in terminal (usually `http://localhost:5173`).
 
-## Quick Test Checklist
+## Ports
+- Backend: `http://localhost:3000`
+- Frontend: `http://localhost:5173`
 
-1. Create a room and join from another browser tab.
-2. Host changes question count/category and starts game.
-3. Answer questions from both clients and verify score updates.
-4. Confirm summary chart shows green correct bar and red incorrect bars.
-5. Confirm results page shows winner and restart options.
-6. Confirm Dark/Light mode works.
-7. Confirm music volume slider works (autoplay may require first interaction due to browser policy).
-8. Confirm Enter key works in Home inputs (name/code/custom count).
+## Quick Multiplayer Check
+1. Open app in two tabs/windows.
+2. Create room in tab 1.
+3. Join from tab 2 with room code.
+4. Start game as host.
+5. Verify questions, score updates, summary chart, and results page.
 
-## Known Notes
+## Features Present
+- Room create/join multiplayer flow (Socket.IO)
+- Host settings (question count, category, difficulty)
+- D3 answer summary chart
+- Light/Dark mode toggle
+- Background music controls (Web Audio API)
+- jQuery micro-interactions
 
-- Browser audio autoplay restrictions vary. If music does not start immediately, first click/keypress unlocks it.
-- jQuery is currently loaded through CDN in client/index.html.
+## Troubleshooting
 
-## Still To Finish
+### Frontend package/module errors (for example pinia)
 
-- Final polishing pass (text copy, tiny UX fixes, responsive checks)
-- Final required docs cleanup:
-	- readme.txt (submission-facing run instructions)
-	- contributions.txt (who did what)
-	- ai-prompts.txt updates
-	- group_members.html verification
-- Final bug sweep and submission zip validation
+```bash
+cd client
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### Cannot connect to game
+- Confirm backend terminal is running on port 3000.
+- Confirm frontend terminal is running on port 5173.
+
+### Music does not autoplay
+- Browser autoplay restrictions can block audio.
+- Click or press any key once to unlock.
+
+## Submission Note
+For final submission, follow `readme.txt` in the project root as the submission-facing run guide.
