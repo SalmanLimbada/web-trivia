@@ -323,7 +323,10 @@ export default {
     socket.on('game-over', this.handleGameOver)
     socket.on('error', this.handleError)
 
-    socket.emit('request-room-state', this.code)
+    socket.emit('request-room-state', {
+      code: this.code,
+      playerName: this.playerName
+    })
   },
   beforeUnmount() {
     socket.off('player-joined', this.handlePlayersJoined)

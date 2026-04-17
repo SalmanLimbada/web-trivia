@@ -439,18 +439,35 @@ io.on('connection', (socket) => {
     }
   })
 
-  socket.on('request-room-state', (code) => {
+  socket.on('request-room-state', (payload) => {
+    const code = typeof payload === 'string' ? payload : payload?.code
+    const playerName = typeof payload === 'string' ? '' : payload?.playerName
     const room = rooms[code]
     if (!room) return
+
+    const isPlayerInRoom = room.players.some((player) => player.id === socket.id)
+    if (!isPlayerInRoom && playerName) {
+      room.players.push({ id: socket.id, name: playerName, score: 0 })
+      socket.data.roomCode = code
+      socket.join(code)
+      emitRoomPlayers(code)
+      emitRoomState(code)
+      emitAnswerProgress(code)
+    }
 
     socket.emit('room-state', getRoomPublicState(code))
 
     if (room.phase === 'game' && room.questions.length > 0) {
+      const elapsedMs = room.questionStartedAt ? Date.now() - room.questionStartedAt : 0
+      const elapsedSeconds = Math.max(0, Math.floor(elapsedMs / 1000))
+      const remainingSeconds = Math.max(0, QUESTION_TIME_LIMIT_SECONDS - elapsedSeconds)
+
       socket.emit('question-updated', {
         question: room.questions[room.currentQuestion],
         current: room.currentQuestion + 1,
         total: room.questions.length,
-        answeredPlayers: room.answeredPlayers.length
+        answeredPlayers: room.answeredPlayers.length,
+        timeLimitSeconds: remainingSeconds
       })
       socket.emit('answer-progress', {
         answeredPlayers: room.answeredPlayers.length,
