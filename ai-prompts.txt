@@ -1,0 +1,15 @@
+i'm making a multiplayer trivia app with express and socket.io, how should i handle room create and join so invalid codes and duplicate names are blocked cleanly
+
+my trivia game uses socket.io, what is a simple event flow for start game, send question, submit answer, next question, and end game
+
+what is a good way to keep frontend and backend game state in sync in a realtime trivia app when a player refreshes or reconnects
+
+can you show an example of clean socket event names and payload shapes for a multiplayer trivia game
+
+what final bug checks should i do before submission for a node.js and socket.io multiplayer project
+
+how can i stop sending too many socket events in my trivia server and only send the ones i actually need
+
+what server logs should i add in socket.io so it's easier to debug room issues during create, join, and reconnect
+
+when someone refreshes mid game sometimes state gets weird, what's the first thing i should check
